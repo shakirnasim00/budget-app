@@ -6,7 +6,7 @@
 <title>Budget</title>
 <meta name="description" content="A personal budgeting and profit tracker." />
 <meta name="color-scheme" content="light dark" />
-<meta name="theme-color" id="themeColor" content="#6A767D" />
+<meta name="theme-color" id="themeColor" content="#7E8A94" />
 
 <!-- Add to Home Screen: opens fullscreen, no browser chrome -->
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -1425,7 +1425,7 @@
     var st = state.settings;
     reduced = reducedMQ || st.reduceMotion;
     document.documentElement.classList.toggle('dark', !!st.dark);
-    document.getElementById('themeColor').setAttribute('content', st.dark ? '#05080F' : '#6A767D');
+    document.getElementById('themeColor').setAttribute('content', st.dark ? '#0A1322' : '#7E8A94');
     document.body.classList.toggle('no-motion', reduced);
     document.body.classList.toggle('no-ambient', !st.ambient);
     document.querySelectorAll('.switch[data-set]').forEach(function (sw) {
