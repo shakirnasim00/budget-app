@@ -60,12 +60,13 @@
     --dialog-bg: rgba(255, 255, 255, .20);
     --dialog-shadow: 0 30px 70px rgba(34, 42, 48, .44);
     --opt-ink: #2C343A; --opt-bg: #E7EDF2;
+    --bg-solid: #6A767D;
 
     --display: 'Switzer', 'Instrument Sans', ui-sans-serif, -apple-system, 'Segoe UI', sans-serif;
     --ui: 'Switzer', 'Instrument Sans', ui-sans-serif, -apple-system, 'Segoe UI', sans-serif;
   }
 
-  body.dark {
+  html.dark {
     /* dark — deep navy falling to black */
     --page-bg:
       radial-gradient(1150px 820px at 84% 40%, #1D3A63 0%, rgba(29, 58, 99, 0) 60%),
@@ -101,24 +102,35 @@
     --dialog-bg: rgba(20, 32, 52, .62);
     --dialog-shadow: 0 30px 70px rgba(0, 0, 0, .6);
     --opt-ink: #E6EEF9; --opt-bg: #16243B;
+    --bg-solid: #05080F;
   }
 
   /* accents lift slightly against the navy so they stay vivid, not neon */
-  body.dark .seg, body.dark .dot, body.dark .swatch { filter: saturate(1.06) brightness(1.14); }
+  html.dark .seg, html.dark .dot, html.dark .swatch { filter: saturate(1.06) brightness(1.14); }
 
   .themeswap { animation: themeFade .34s ease; }
   @keyframes themeFade { from { opacity: .3; } }
 
   * { box-sizing: border-box; }
 
+  html {
+    background: var(--bg-solid);
+    min-height: 100%;
+  }
+
   body {
     margin: 0;
     min-height: 100vh;
     font-family: var(--ui);
     color: var(--ink);
-    background: var(--page-bg);
-    background-attachment: fixed;
+    background: transparent;
+    overscroll-behavior-y: none;
     -webkit-font-smoothing: antialiased;
+  }
+  /* the gradient, painted once across the viewport and never scrolled */
+  body::before {
+    content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background: var(--page-bg);
   }
   /* deepens the slate just enough for white type to hold up */
   body::after {
@@ -183,7 +195,7 @@
     fill: none; stroke: #B34355; stroke-width: 22; stroke-linecap: butt;
     transition: stroke-dasharray .72s cubic-bezier(.22,.85,.26,1);
   }
-  body.dark .lossarc { stroke: #C9506A; }
+  html.dark .lossarc { stroke: #C9506A; }
   .profit-ring .rc-total { font-size: clamp(32px, 7vw, 44px); }
   .profit-ring.loss .rc-total { color: #FFC9D2; }
   .pgrad-seg { fill: none; stroke-width: 22; }
@@ -1412,7 +1424,7 @@
   function applySettings() {
     var st = state.settings;
     reduced = reducedMQ || st.reduceMotion;
-    document.body.classList.toggle('dark', !!st.dark);
+    document.documentElement.classList.toggle('dark', !!st.dark);
     document.getElementById('themeColor').setAttribute('content', st.dark ? '#05080F' : '#6A767D');
     document.body.classList.toggle('no-motion', reduced);
     document.body.classList.toggle('no-ambient', !st.ambient);
