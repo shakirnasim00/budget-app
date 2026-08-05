@@ -312,6 +312,7 @@
   }
   .btn:hover { background: var(--row-hover); transform: translateY(-1px); }
   .btn:active { transform: translateY(1px) scale(.985); box-shadow: inset 0 1px 3px rgba(0,0,0,.22); transition-duration: .07s; }
+  .btn:disabled { opacity: .55; cursor: default; transform: none; }
   .btn.ghost { background: var(--row); border-color: var(--edge-soft); box-shadow: none; }
   .btn.ghost:hover { background: var(--row-hover); }
   .btn.primary {
@@ -540,6 +541,60 @@
   .dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
   .err { font-size: 12px; color: #FFD9DE; min-height: 16px; margin-top: -6px; margin-bottom: 8px; }
 
+  /* ---------- sign in ---------- */
+  .authwrap { display: flex; flex-direction: column; align-items: center; padding-top: 2vh; }
+  .mark { width: 54px; height: 54px; margin-bottom: 20px; filter: drop-shadow(0 8px 22px rgba(0,0,0,.3)); }
+  .auth-title {
+    font-family: var(--display); font-size: clamp(36px, 6.5vw, 50px); font-weight: 500;
+    letter-spacing: -0.032em; line-height: 1; margin: 0; text-shadow: var(--text-shadow);
+  }
+  .auth-sub { margin: 12px 0 0; font-size: 13px; color: var(--ink-soft); text-align: center; max-width: 300px; line-height: 1.5; }
+
+  .auth-panel { display: block; width: min(400px, 100%); margin: 28px auto 0; padding: 28px 26px; }
+  .auth-panel .field { margin-bottom: 16px; }
+  .auth-panel .btn { width: 100%; margin-top: 4px; }
+
+  .pass-wrap { position: relative; }
+  .pass-wrap input { padding-right: 66px; }
+  .peek {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: none; border: 0; padding: 6px 8px; border-radius: 9px; cursor: pointer;
+    font-family: var(--ui); font-size: 11px; font-weight: 500; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-faint); transition: .16s ease;
+  }
+  .peek:hover { color: var(--ink); background: var(--row-hover); }
+
+  .linkbtn {
+    display: block; width: 100%; margin-top: 12px; padding: 8px;
+    background: none; border: 0; cursor: pointer;
+    font-family: var(--ui); font-size: 12px; letter-spacing: .03em;
+    color: var(--ink-faint); border-radius: 10px; transition: .16s ease;
+  }
+  .linkbtn:hover { color: var(--ink); background: var(--row); }
+
+  .auth-foot {
+    margin-top: 20px; padding-top: 18px; text-align: center;
+    border-top: 1px solid var(--edge-soft);
+    font-size: 13px; color: var(--ink-soft);
+  }
+  .inlink {
+    background: none; border: 0; padding: 3px 5px; cursor: pointer; border-radius: 7px;
+    font-family: var(--ui); font-size: 13px; font-weight: 600; color: var(--ink);
+    text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
+    text-decoration-color: var(--edge); transition: .16s ease;
+  }
+  .inlink:hover { background: var(--row-hover); text-decoration-color: var(--ink); }
+
+  .note {
+    font-size: 12px; color: #CFF3DF; min-height: 16px;
+    margin-top: -6px; margin-bottom: 8px;
+  }
+  .who {
+    font-family: var(--ui); font-size: 13px; color: var(--ink-soft);
+    font-variant-numeric: tabular-nums; word-break: break-all;
+  }
+  .booting { text-align: center; padding: 60px 20px; color: var(--ink-faint); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; }
+
   @media (max-width: 1000px) {
     .panel { grid-template-columns: minmax(0, 330px) minmax(0, 1fr); gap: 32px; }
     .ring-holder { width: min(320px, 78vw); }
@@ -583,7 +638,46 @@
     </button>
   </div>
 
-  <div id="budgetView" class="page">
+  <div id="bootView" class="booting">Checking your session</div>
+
+  <div id="authView" class="page hidden">
+    <div class="authwrap">
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="32" cy="32" r="25" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="8" />
+        <circle cx="32" cy="32" r="25" fill="none" stroke="#25CE9B" stroke-width="8" stroke-linecap="round"
+                stroke-dasharray="88 69.08" transform="rotate(-90 32 32)" />
+        <circle cx="32" cy="32" r="25" fill="none" stroke="#D94459" stroke-width="8" stroke-linecap="round"
+                stroke-dasharray="44 113.08" stroke-dashoffset="-94" transform="rotate(-90 32 32)" />
+      </svg>
+      <h1 class="auth-title">Auctus</h1>
+      <p class="auth-sub" id="authSub">What you earn, what you spend, and what is left.</p>
+
+      <div class="panel auth-panel">
+        <label class="field"><span>Email</span>
+          <input id="a-email" type="email" autocomplete="email" placeholder="you@example.com" /></label>
+
+        <label class="field"><span>Password</span>
+          <div class="pass-wrap">
+            <input id="a-pass" type="password" autocomplete="current-password" placeholder="At least 6 characters" />
+            <button type="button" class="peek" id="a-peek" aria-label="Show password">Show</button>
+          </div>
+        </label>
+
+        <div class="err" id="a-err"></div>
+        <div class="note" id="a-note"></div>
+
+        <button class="btn primary" id="a-go">Log in</button>
+        <button class="linkbtn" id="a-forgot">Forgot your password?</button>
+
+        <div class="auth-foot">
+          <span id="a-prompt">New to Auctus?</span>
+          <button class="inlink" id="a-toggle">Sign up</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="budgetView" class="page hidden">
   <div class="month-bar">
     <button class="navbtn" id="prevMonth" aria-label="Previous month">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
@@ -716,6 +810,14 @@
 
     <div class="panel" style="display:block; margin-top:26px;">
       <div class="set-group">
+        <h2>Account</h2>
+        <div class="set-row">
+          <div class="txt"><b>Signed in as</b><small class="who" id="s-who">&nbsp;</small></div>
+          <button class="btn ghost" id="s-signout">Sign out</button>
+        </div>
+      </div>
+
+      <div class="set-group">
         <h2>Money</h2>
         <div class="set-row">
           <div class="txt"><b>Show cents</b><small>Off rounds everything to the nearest dollar.</small></div>
@@ -779,7 +881,64 @@
   <div class="dialog" role="dialog" aria-modal="true" id="dialog"></div>
 </div>
 
-<script>
+<!-- ---------------------------------------------------------------
+     Firebase lives in its own module and hands the app a small, plain
+     surface on window.FB. The app below stays the ES5 IIFE it always
+     was; it just talks to this. Both are `type="module"`, and module
+     scripts evaluate in document order after their imports resolve,
+     so window.FB is always ready before the app runs.
+     --------------------------------------------------------------- -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-analytics.js";
+  import {
+    getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence,
+    signInWithEmailAndPassword, createUserWithEmailAndPassword,
+    signOut, sendPasswordResetEmail
+  } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCnZH4OsbI7_aliScAiNl9ZO8hEfZ9FpNU",
+    authDomain: "auctus-edab6.firebaseapp.com",
+    projectId: "auctus-edab6",
+    storageBucket: "auctus-edab6.firebasestorage.app",
+    messagingSenderId: "273071825665",
+    appId: "1:273071825665:web:0197fb0158d7a95b027100",
+    measurementId: "G-EERZ2VJWEX"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  /* analytics throws on file:// and in some privacy modes; it must not
+     take the rest of this module down with it */
+  try { getAnalytics(app); } catch (err) { /* fine without it */ }
+
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  await setPersistence(auth, browserLocalPersistence).catch(function () {});
+
+  window.FB = {
+    onAuth: function (cb) { return onAuthStateChanged(auth, cb); },
+    signIn: function (email, pass) { return signInWithEmailAndPassword(auth, email, pass); },
+    signUp: function (email, pass) { return createUserWithEmailAndPassword(auth, email, pass); },
+    signOut: function () { return signOut(auth); },
+    resetPassword: function (email) { return sendPasswordResetEmail(auth, email); },
+    readDoc: function (uid) {
+      return getDoc(doc(db, 'users', uid)).then(function (snap) {
+        return snap.exists() ? (snap.data().data || null) : null;
+      });
+    },
+    writeDoc: function (uid, json) {
+      return setDoc(doc(db, 'users', uid), { data: json, updatedAt: serverTimestamp() });
+    }
+  };
+  window.dispatchEvent(new Event('fb-ready'));
+</script>
+
+<script type="module">
 (function () {
   var CIRC = 2 * Math.PI * 108;
 
@@ -816,19 +975,40 @@
   var today = new Date();
   var view = { year: today.getFullYear(), month: today.getMonth(), tab: 'expenses' };
 
-  var state = {
-    version: 1,
-    cats: JSON.parse(JSON.stringify({ expenses: DEFAULT_CATS.expenses, revenue: DEFAULT_CATS.revenue })),
-    budgets: { expenses: {}, revenue: {} },
-    targets: { expenses: 3000, revenue: 6000, profit: 3000 },
-    entries: {},
-    settings: {
-      dark: false, showCents: false, ambient: true,
-      reduceMotion: false, confirmDelete: true, defaultTab: 'expenses'
-    }
-  };
-  DEFAULT_CATS.expenses.forEach(function (c) { state.budgets.expenses[c.id] = c.budget; });
-  DEFAULT_CATS.revenue.forEach(function (c) { state.budgets.revenue[c.id] = c.budget; });
+  function freshState() {
+    var s = {
+      version: 1,
+      cats: JSON.parse(JSON.stringify({ expenses: DEFAULT_CATS.expenses, revenue: DEFAULT_CATS.revenue })),
+      budgets: { expenses: {}, revenue: {} },
+      targets: { expenses: 3000, revenue: 6000, profit: 3000 },
+      entries: {},
+      settings: {
+        dark: false, showCents: false, ambient: true,
+        reduceMotion: false, confirmDelete: true, defaultTab: 'expenses'
+      }
+    };
+    DEFAULT_CATS.expenses.forEach(function (c) { s.budgets.expenses[c.id] = c.budget; });
+    DEFAULT_CATS.revenue.forEach(function (c) { s.budgets.revenue[c.id] = c.budget; });
+    return s;
+  }
+
+  var state = freshState();
+
+  /* Signing out has to wipe what's in memory, or the next person to sign
+     in on this device sees the last one's numbers before the read lands. */
+  function clearState() {
+    var look = {
+      dark: state.settings.dark,
+      ambient: state.settings.ambient,
+      reduceMotion: state.settings.reduceMotion
+    };
+    state = freshState();
+    state.settings.dark = look.dark;
+    state.settings.ambient = look.ambient;
+    state.settings.reduceMotion = look.reduceMotion;
+    prevSeg = {}; prevAmt = {}; prevTotal = 0; prevProfit = 0; ctxKey = '';
+    view = { year: today.getFullYear(), month: today.getMonth(), tab: 'expenses' };
+  }
 
   function catList(tab) { return state.cats[tab]; }
   function findCat(tab, id) {
@@ -896,42 +1076,39 @@
      Swapping backends means writing one of these and assigning it to
      `Adapter` below. Nothing else in the app needs to change.
 
-     A Supabase adapter would look like:
+     Firebase is the live backend. The whole state object goes into one
+     Firestore document per user, users/{uid}, as a JSON string. It never
+     approaches the 1 MB document limit, and it means every mutation path
+     in the app kept working untouched.
 
-         var SupabaseAdapter = {
-           read: function () {
-             return supabase.from('budgets').select('data')
-               .eq('user_id', userId).single()
-               .then(function (r) { return r.data ? r.data.data : null; });
-           },
-           write: function (json) {
-             return supabase.from('budgets')
-               .upsert({ user_id: userId, data: json });
-           }
-         };
-
-     Saves are already debounced and async, so a network round trip
-     needs no further changes.
+     Saves are already debounced and async, so the network round trip
+     needed no further changes.
      --------------------------------------------------------------- */
 
-  var HostAdapter = {
-    read: function () {
-      return Promise.resolve(window.storage.get(KEY, false))
-        .then(function (r) { return r && r.value ? r.value : null; });
-    },
-    write: function (json) { return Promise.resolve(window.storage.set(KEY, json, false)); }
-  };
+  function localRead() {
+    try { return localStorage.getItem(KEY); } catch (err) { return null; }
+  }
+  function localWrite(json) {
+    try { localStorage.setItem(KEY, json); } catch (err) { /* private mode, full disk */ }
+  }
 
-  var LocalAdapter = {
-    read: function () { return Promise.resolve(localStorage.getItem(KEY)); },
-    write: function (json) { localStorage.setItem(KEY, json); return Promise.resolve(); }
-  };
+  /* Cloud is the source of truth; localStorage is a mirror so the app can
+     paint instantly on the next load instead of waiting on the network. */
+  function FirebaseAdapter(uid) {
+    return {
+      read: function () { return window.FB.readDoc(uid); },
+      write: function (json) {
+        localWrite(json);
+        return window.FB.writeDoc(uid, json);
+      }
+    };
+  }
 
-  /* Claude's artifact storage when running here; the browser's own on GitHub Pages. */
-  var Adapter = (typeof window.storage === 'object' && window.storage) ? HostAdapter : LocalAdapter;
+  var Adapter = null;
 
   var saveTimer = null;
   function save() {
+    if (!Adapter) return;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(function () {
       try {
@@ -940,9 +1117,8 @@
       } catch (err) { console.error('Could not save', err); }
     }, 220);
   }
-  async function load() {
+  function hydrate(raw) {
     try {
-      var raw = await Adapter.read();
       if (raw) {
         var saved = JSON.parse(raw);
         if (saved.cats && saved.cats.expenses && saved.cats.revenue) state.cats = saved.cats;
@@ -960,7 +1136,7 @@
         });
       }
     } catch (err) {
-      /* nothing saved yet, or storage unavailable — start fresh */
+      /* nothing saved yet, or the document is malformed — start fresh */
     }
   }
 
@@ -1435,10 +1611,12 @@
   }
 
   function showPage(name) {
-    var settings = name === 'settings', profit = name === 'profit';
-    document.getElementById('budgetView').classList.toggle('hidden', settings || profit);
-    document.getElementById('gear').classList.toggle('hidden', settings);
-    document.getElementById('profitBtn').classList.toggle('hidden', settings || profit);
+    var settings = name === 'settings', profit = name === 'profit', auth = name === 'auth';
+    document.getElementById('bootView').classList.add('hidden');
+    document.getElementById('authView').classList.toggle('hidden', !auth);
+    document.getElementById('budgetView').classList.toggle('hidden', settings || profit || auth);
+    document.getElementById('gear').classList.toggle('hidden', settings || auth);
+    document.getElementById('profitBtn').classList.toggle('hidden', settings || profit || auth);
     document.getElementById('homeBtn').classList.toggle('hidden', !profit);
     var pv = document.getElementById('profitView');
     pv.classList.toggle('hidden', !profit);
@@ -1451,19 +1629,20 @@
     if (settings) {
       document.getElementById('s-clear-note').textContent =
         'Removes every entry logged in ' + MONTHS[view.month] + '. Budgets stay.';
+      document.getElementById('s-who').textContent = currentUser ? currentUser.email : '\u2014';
       applySettings();
       sv.classList.remove('page'); void sv.offsetWidth; sv.classList.add('page');
-    } else if (!profit) {
+    } else if (!profit && !auth) {
       render();
     }
     window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
   }
 
-  function confirmThen(title, body, actionLabel, fn) {
+  function confirmThen(title, body, actionLabel, fn, cancelLabel) {
     dialog.innerHTML =
       '<h3>' + title + '</h3><p class="sub">' + body + '</p>' +
       '<div class="dialog-actions">' +
-        '<button class="btn ghost" id="f-cancel">Keep it</button>' +
+        '<button class="btn ghost" id="f-cancel">' + (cancelLabel || 'Keep it') + '</button>' +
         '<button class="btn warn" id="f-go">' + actionLabel + '</button>' +
       '</div>';
     scrim.classList.add('open');
@@ -1565,6 +1744,16 @@
           save(); showPage('budget');
         });
     };
+
+    document.getElementById('s-signout').onclick = function () {
+      confirmThen('Sign out?',
+        'Your data stays in the cloud and comes back the next time you sign in.',
+        'Sign out', function () {
+          window.FB.signOut().catch(function (err) {
+            confirmThen('Could not sign out', authMessage(err), 'Close', function () {});
+          });
+        });
+    };
   })();
 
   /* ---------- wiring ---------- */
@@ -1623,12 +1812,182 @@
       'Delete', drop);
   });
 
-  buildProfitRing();
-  load().then(function () {
+  /* ---------- auth ---------- */
+  var currentUser = null;
+  var creating = false;
+
+  function authMessage(err) {
+    switch (err && err.code) {
+      case 'auth/invalid-email':          return 'That email address is not formatted correctly.';
+      case 'auth/missing-password':       return 'Enter your password.';
+      case 'auth/weak-password':          return 'Passwords need at least 6 characters.';
+      case 'auth/email-already-in-use':   return 'An account already uses that email. Sign in instead.';
+      case 'auth/invalid-credential':
+      case 'auth/wrong-password':
+      case 'auth/user-not-found':         return 'That email and password do not match an account.';
+      case 'auth/too-many-requests':      return 'Too many attempts. Wait a minute, then try again.';
+      case 'auth/network-request-failed': return 'No connection. Check your network and try again.';
+      case 'auth/operation-not-allowed':  return 'Email sign-in is not switched on for this Firebase project yet.';
+      case 'auth/unauthorized-domain':    return 'This domain is not in the Firebase authorized domains list.';
+      default: return (err && err.message) || 'Something went wrong. Try again.';
+    }
+  }
+
+  function authBusy(on) {
+    document.getElementById('a-go').disabled = on;
+    document.getElementById('a-go').textContent =
+      on ? 'Working\u2026' : (creating ? 'Create account' : 'Log in');
+  }
+  function authError(msg) {
+    document.getElementById('a-err').textContent = msg || '';
+    document.getElementById('a-note').textContent = '';
+  }
+  function authNote(msg) {
+    document.getElementById('a-note').textContent = msg || '';
+    document.getElementById('a-err').textContent = '';
+  }
+
+  function setAuthMode(makeNew) {
+    creating = makeNew;
+    document.getElementById('authSub').textContent = creating
+      ? 'Set up an account and your numbers follow you to any device.'
+      : 'What you earn, what you spend, and what is left.';
+    document.getElementById('a-go').textContent = creating ? 'Create account' : 'Log in';
+    document.getElementById('a-prompt').textContent = creating
+      ? 'Already have an account?' : 'New to Auctus?';
+    document.getElementById('a-toggle').textContent = creating ? 'Log in' : 'Sign up';
+    document.getElementById('a-pass').setAttribute(
+      'autocomplete', creating ? 'new-password' : 'current-password');
+    document.getElementById('a-pass').setAttribute(
+      'placeholder', creating ? 'At least 6 characters' : 'Your password');
+    document.getElementById('a-forgot').classList.toggle('hidden', creating);
+    authError('');
+  }
+
+  function submitAuth() {
+    if (document.getElementById('a-go').disabled) return;
+    var email = document.getElementById('a-email').value.trim();
+    var pass = document.getElementById('a-pass').value;
+    if (!email) { authError('Enter your email address.'); return; }
+    if (!pass) { authError('Enter your password.'); return; }
+    authBusy(true);
+    var run = creating ? window.FB.signUp(email, pass) : window.FB.signIn(email, pass);
+    run.catch(function (err) {
+      authBusy(false);
+      authError(authMessage(err));
+    });
+    /* on success the auth listener takes over and swaps the page */
+  }
+
+  document.getElementById('a-go').onclick = submitAuth;
+  document.getElementById('a-toggle').onclick = function () {
+    setAuthMode(!creating);
+    document.getElementById('a-email').focus();
+  };
+  document.getElementById('a-peek').onclick = function () {
+    var pass = document.getElementById('a-pass');
+    var hidden = pass.type === 'password';
+    pass.type = hidden ? 'text' : 'password';
+    this.textContent = hidden ? 'Hide' : 'Show';
+    this.setAttribute('aria-label', hidden ? 'Hide password' : 'Show password');
+    pass.focus();
+  };
+  document.getElementById('authView').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target.tagName === 'INPUT') submitAuth();
+  });
+  document.getElementById('a-forgot').onclick = function () {
+    var email = document.getElementById('a-email').value.trim();
+    if (!email) {
+      authError('Enter your email address first, then press this again.');
+      document.getElementById('a-email').focus();
+      return;
+    }
+    window.FB.resetPassword(email).then(function () {
+      authNote('Reset link sent to ' + email + '. Check your spam folder too.');
+    }).catch(function (err) { authError(authMessage(err)); });
+  };
+
+  /* ---------- boot ---------- */
+  function countEntries(raw) {
+    try {
+      var s = JSON.parse(raw);
+      return Object.keys(s.entries || {}).reduce(function (n, mk) {
+        return n + (s.entries[mk] || []).length;
+      }, 0);
+    } catch (err) { return 0; }
+  }
+
+  function startApp(raw) {
+    hydrate(raw);
     view.tab = state.settings.defaultTab || 'expenses';
     applySettings();
-    render();
-  });
+    showPage('budget');
+  }
+
+  function signedIn(user) {
+    currentUser = user;
+    Adapter = FirebaseAdapter(user.uid);
+    var onDevice = localRead();
+    var loose = countEntries(onDevice);
+
+    window.FB.readDoc(user.uid).then(function (cloud) {
+      if (!cloud && loose) {
+        /* first sign-in on a device that was already being used offline —
+           the local data is the only copy, so it becomes the account */
+        startApp(onDevice);
+        save();
+        return;
+      }
+      startApp(cloud);
+      localWrite(cloud || '');
+      if (cloud && loose && onDevice !== cloud) {
+        confirmThen('This device has ' + loose + (loose === 1 ? ' entry' : ' entries') + ' from before you signed in',
+          'Your account already has data. Uploading replaces the account with what is on this device. Keeping the account discards the local copy.',
+          'Upload this device', function () {
+            startApp(onDevice);
+            save();
+          }, 'Keep the account');
+      }
+    }).catch(function (err) {
+      /* a read that fails is usually rules, not the network */
+      startApp(localRead());
+      console.error('Could not read your data', err);
+      confirmThen('Could not reach your data',
+        'Showing the last copy saved on this device. ' + ((err && err.message) || ''),
+        'Close', function () {});
+    });
+  }
+
+  function signedOut() {
+    /* The auth listener also fires with null on first load, before anyone has
+       signed in. Only a real sign-out clears the mirror — otherwise a device
+       holding offline data loses it the moment the page opens. */
+    var wasSignedIn = !!currentUser;
+    currentUser = null;
+    Adapter = null;
+    clearTimeout(saveTimer);
+    if (wasSignedIn) localWrite('');
+    clearState();
+    applySettings();
+    closeDialog();
+    authBusy(false);
+    setAuthMode(false);
+    var pass = document.getElementById('a-pass');
+    pass.value = '';
+    pass.type = 'password';
+    document.getElementById('a-peek').textContent = 'Show';
+    showPage('auth');
+  }
+
+  buildProfitRing();
+  if (!window.FB) {
+    document.getElementById('bootView').textContent =
+      'Could not load Firebase. Check your connection and reload.';
+  } else {
+    window.FB.onAuth(function (user) {
+      if (user) signedIn(user); else signedOut();
+    });
+  }
 })();
 </script>
 
