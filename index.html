@@ -508,6 +508,19 @@
     transition: .16s ease;
   }
   input::placeholder { color: rgba(255,255,255,.5); }
+  /* Chrome paints a solid yellow over autofilled inputs. Clipping the
+     background to the glyphs hides it, and the absurd transition delay stops
+     it ever animating in, so the field keeps its own translucent fill. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: var(--ink);
+    caret-color: var(--ink);
+    transition: background-color 100000s ease-in-out 0s;
+  }
   input:focus, select:focus { background: rgba(255,255,255,.26); border-color: var(--edge); outline: none; }
   select option { color: var(--opt-ink); background: var(--opt-bg); }
   .checkline {
@@ -580,10 +593,9 @@
   .inlink {
     background: none; border: 0; padding: 3px 5px; cursor: pointer; border-radius: 7px;
     font-family: var(--ui); font-size: 13px; font-weight: 600; color: var(--ink);
-    text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
-    text-decoration-color: var(--edge); transition: .16s ease;
+    transition: .16s ease;
   }
-  .inlink:hover { background: var(--row-hover); text-decoration-color: var(--ink); }
+  .inlink:hover { background: var(--row-hover); }
 
   .note {
     font-size: 12px; color: #CFF3DF; min-height: 16px;
@@ -594,6 +606,35 @@
     font-variant-numeric: tabular-nums; word-break: break-all;
   }
   .booting { text-align: center; padding: 60px 20px; color: var(--ink-faint); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; }
+
+  /* ---------- welcome ---------- */
+  .welcome {
+    position: fixed; inset: 0; z-index: 60;
+    display: grid; place-items: center; padding: 20px;
+    pointer-events: none;
+    background: var(--scrim);
+    animation: welcomeVeil .42s ease;
+  }
+  .welcome.out { animation: welcomeVeilOut .5s ease forwards; }
+  .welcome .card {
+    width: min(340px, 100%); padding: 32px 28px; text-align: center;
+    border-radius: 26px;
+    background: var(--dialog-bg); border: 1px solid var(--edge);
+    backdrop-filter: blur(30px) saturate(150%); -webkit-backdrop-filter: blur(30px) saturate(150%);
+    box-shadow: var(--dialog-shadow), inset 0 1px 0 var(--inset-hi);
+    animation: welcomeIn .54s cubic-bezier(.22,.85,.26,1);
+  }
+  .welcome.out .card { animation: welcomeOut .5s cubic-bezier(.4,0,.7,1) forwards; }
+  .welcome .mark { width: 46px; height: 46px; margin: 0 0 16px; }
+  .welcome h2 {
+    margin: 0; font-family: var(--display); font-size: 26px; font-weight: 500;
+    letter-spacing: -0.025em; text-shadow: var(--text-shadow);
+  }
+  .welcome p { margin: 9px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
+  @keyframes welcomeVeil { from { opacity: 0; } }
+  @keyframes welcomeVeilOut { to { opacity: 0; } }
+  @keyframes welcomeIn { from { opacity: 0; transform: translateY(18px) scale(.96); } }
+  @keyframes welcomeOut { to { opacity: 0; transform: translateY(-10px) scale(.98); } }
 
   @media (max-width: 1000px) {
     .panel { grid-template-columns: minmax(0, 330px) minmax(0, 1fr); gap: 32px; }
@@ -650,10 +691,13 @@
                 stroke-dasharray="44 113.08" stroke-dashoffset="-94" transform="rotate(-90 32 32)" />
       </svg>
       <h1 class="auth-title">Auctus</h1>
-      <p class="auth-sub" id="authSub">What you earn, what you spend, and what is left.</p>
+      <p class="auth-sub" id="authSub">The smarter way to track your money.</p>
 
       <div class="panel auth-panel">
         <form id="a-form">
+          <label class="field hidden" id="a-namefield"><span>Name</span>
+            <input id="a-name" type="text" autocomplete="name" maxlength="40" placeholder="What should we call you?" /></label>
+
           <label class="field"><span>Email</span>
             <input id="a-email" type="email" autocomplete="email" placeholder="you@example.com" /></label>
 
@@ -902,7 +946,7 @@
     const {
       getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence,
       signInWithEmailAndPassword, createUserWithEmailAndPassword,
-      signOut, sendPasswordResetEmail
+      signOut, sendPasswordResetEmail, updateProfile
     } = await import("https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js");
     const {
       getFirestore, doc, getDoc, setDoc, serverTimestamp
@@ -935,7 +979,14 @@
     window.FB = {
       onAuth: function (cb) { return onAuthStateChanged(auth, cb); },
       signIn: function (email, pass) { return signInWithEmailAndPassword(auth, email, pass); },
-      signUp: function (email, pass) { return createUserWithEmailAndPassword(auth, email, pass); },
+      signUp: function (email, pass, name) {
+        return createUserWithEmailAndPassword(auth, email, pass).then(function (cred) {
+          /* the auth listener has already fired by now, so the app carries the
+             name itself — this only records it on the Firebase account */
+          if (name) return updateProfile(cred.user, { displayName: name }).then(function () { return cred; });
+          return cred;
+        });
+      },
       signOut: function () { return signOut(auth); },
       resetPassword: function (email) { return sendPasswordResetEmail(auth, email); },
       readDoc: function (uid) {
@@ -997,6 +1048,7 @@
       budgets: { expenses: {}, revenue: {} },
       targets: { expenses: 3000, revenue: 6000, profit: 3000 },
       entries: {},
+      profile: { name: '' },
       settings: {
         dark: false, showCents: false, ambient: true,
         reduceMotion: false, confirmDelete: true, defaultTab: 'expenses'
@@ -1146,6 +1198,7 @@
         }
         if (saved.targets) state.targets = saved.targets;
         if (saved.entries) state.entries = saved.entries;
+        if (saved.profile && saved.profile.name) state.profile.name = saved.profile.name;
         if (saved.settings) Object.keys(saved.settings).forEach(function (k) {
           if (state.settings[k] !== undefined) state.settings[k] = saved.settings[k];
         });
@@ -1644,7 +1697,9 @@
     if (settings) {
       document.getElementById('s-clear-note').textContent =
         'Removes every entry logged in ' + MONTHS[view.month] + '. Budgets stay.';
-      document.getElementById('s-who').textContent = currentUser ? currentUser.email : '\u2014';
+      document.getElementById('s-who').textContent = currentUser
+        ? ((state.profile.name ? state.profile.name + ' \u00B7 ' : '') + currentUser.email)
+        : '\u2014';
       applySettings();
       sv.classList.remove('page'); void sv.offsetWidth; sv.classList.add('page');
     } else if (!profit && !auth) {
@@ -1727,6 +1782,7 @@
             state.budgets = incoming.budgets;
             state.entries = incoming.entries;
             state.targets = incoming.targets || state.targets;
+            if (incoming.profile && incoming.profile.name) state.profile.name = incoming.profile.name;
             if (incoming.settings) Object.keys(incoming.settings).forEach(function (k) {
               if (state.settings[k] !== undefined) state.settings[k] = incoming.settings[k];
             });
@@ -1830,6 +1886,7 @@
   /* ---------- auth ---------- */
   var currentUser = null;
   var creating = false;
+  var pendingName = null;
 
   function authMessage(err) {
     switch (err && err.code) {
@@ -1851,7 +1908,8 @@
   function authBusy(on) {
     document.getElementById('a-go').disabled = on;
     document.getElementById('a-go').textContent =
-      on ? 'Working\u2026' : (creating ? 'Create account' : 'Log in');
+      on ? (creating ? 'Creating account\u2026' : 'Logging in\u2026')
+         : (creating ? 'Create account' : 'Log in');
   }
   function authError(msg) {
     document.getElementById('a-err').textContent = msg || '';
@@ -1866,7 +1924,9 @@
     creating = makeNew;
     document.getElementById('authSub').textContent = creating
       ? 'Set up an account and your numbers follow you to any device.'
-      : 'What you earn, what you spend, and what is left.';
+      : 'The smarter way to track your money.';
+    document.getElementById('a-namefield').classList.toggle('hidden', !creating);
+    if (!creating) document.getElementById('a-name').value = '';
     document.getElementById('a-go').textContent = creating ? 'Create account' : 'Log in';
     document.getElementById('a-prompt').textContent = creating
       ? 'Already have an account?' : 'New to Auctus?';
@@ -1883,11 +1943,21 @@
     if (document.getElementById('a-go').disabled) return;
     var email = document.getElementById('a-email').value.trim();
     var pass = document.getElementById('a-pass').value;
+    var name = document.getElementById('a-name').value.trim();
+    if (creating && !name) {
+      authError('Enter the name you want to go by.');
+      document.getElementById('a-name').focus();
+      return;
+    }
     if (!email) { authError('Enter your email address.'); return; }
     if (!pass) { authError('Enter your password.'); return; }
     authBusy(true);
-    var run = creating ? window.FB.signUp(email, pass) : window.FB.signIn(email, pass);
+    /* the auth listener fires the moment the account exists, before signUp
+       resolves, so hand the name over now rather than reading it back */
+    if (creating) pendingName = name;
+    var run = creating ? window.FB.signUp(email, pass, name) : window.FB.signIn(email, pass);
     run.catch(function (err) {
+      pendingName = null;
       authBusy(false);
       authError(authMessage(err));
     });
@@ -1939,9 +2009,33 @@
     showPage('budget');
   }
 
+  function showWelcome(name) {
+    var el = document.createElement('div');
+    el.className = 'welcome';
+    el.setAttribute('role', 'status');
+    el.innerHTML =
+      '<div class="card">' +
+        '<svg class="mark" viewBox="0 0 64 64" aria-hidden="true">' +
+          '<circle cx="32" cy="32" r="25" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="8"/>' +
+          '<circle cx="32" cy="32" r="25" fill="none" stroke="#25CE9B" stroke-width="8" stroke-linecap="round"' +
+          ' stroke-dasharray="88 69.08" transform="rotate(-90 32 32)"/>' +
+          '<circle cx="32" cy="32" r="25" fill="none" stroke="#D94459" stroke-width="8" stroke-linecap="round"' +
+          ' stroke-dasharray="44 113.08" stroke-dashoffset="-94" transform="rotate(-90 32 32)"/>' +
+        '</svg>' +
+        '<h2>Welcome to Auctus</h2>' +
+        '<p>' + (name ? 'Good to have you, ' + esc(name) + '. Your first month is ready.'
+                      : 'Your first month is ready.') + '</p>' +
+      '</div>';
+    document.body.appendChild(el);
+    setTimeout(function () { el.classList.add('out'); }, reduced ? 1800 : 2100);
+    setTimeout(function () { el.remove(); }, reduced ? 2000 : 2650);
+  }
+
   function signedIn(user) {
     currentUser = user;
     Adapter = FirebaseAdapter(user.uid);
+    var justSignedUp = pendingName;
+    pendingName = null;
     var onDevice = localRead();
     var loose = countEntries(onDevice);
 
@@ -1950,11 +2044,18 @@
         /* first sign-in on a device that was already being used offline —
            the local data is the only copy, so it becomes the account */
         startApp(onDevice);
+        if (justSignedUp) { state.profile.name = justSignedUp; showWelcome(justSignedUp); }
         save();
         return;
       }
       startApp(cloud);
       localWrite(cloud || '');
+      if (justSignedUp) {
+        state.profile.name = justSignedUp;
+        save();
+        showWelcome(justSignedUp);
+        return;
+      }
       if (cloud && loose && onDevice !== cloud) {
         confirmThen('This device has ' + loose + (loose === 1 ? ' entry' : ' entries') + ' from before you signed in',
           'Your account already has data. Uploading replaces the account with what is on this device. Keeping the account discards the local copy.',
@@ -1987,6 +2088,7 @@
     closeDialog();
     authBusy(false);
     setAuthMode(false);
+    document.getElementById('a-name').value = '';
     var pass = document.getElementById('a-pass');
     pass.value = '';
     pass.type = 'password';
