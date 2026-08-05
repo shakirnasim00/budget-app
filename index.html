@@ -15,7 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="Budget" />
 <meta name="format-detection" content="telephone=no" />
 
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='24' fill='none' stroke='%2395A1AC' stroke-width='11'/%3E%3Ccircle cx='32' cy='32' r='24' fill='none' stroke='%23D94459' stroke-width='11' stroke-dasharray='105 151' transform='rotate(-90 32 32)' stroke-linecap='round'/%3E%3C/svg%3E" />
+<link rel="icon" type="image/png" sizes="64x64" href="auctus-mark-64.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="auctus-mark-192.png" />
+<link rel="apple-touch-icon" href="auctus-mark-192.png" />
 <style>
   @import url('https://api.fontshare.com/v2/css?f[]=switzer@300,400,500,600&display=swap');
   @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap');
@@ -556,7 +558,11 @@
 
   /* ---------- sign in ---------- */
   .authwrap { display: flex; flex-direction: column; align-items: center; padding-top: 2vh; }
-  .mark { width: 54px; height: 54px; margin-bottom: 20px; filter: drop-shadow(0 8px 22px rgba(0,0,0,.3)); }
+  .mark {
+    width: 62px; height: 62px; display: block; margin: 0 auto 20px;
+    object-fit: contain;
+    filter: drop-shadow(0 8px 22px rgba(0,0,0,.34));
+  }
   .auth-title {
     font-family: var(--display); font-size: clamp(36px, 6.5vw, 50px); font-weight: 500;
     letter-spacing: -0.032em; line-height: 1; margin: 0; text-shadow: var(--text-shadow);
@@ -625,7 +631,7 @@
     animation: welcomeIn .54s cubic-bezier(.22,.85,.26,1);
   }
   .welcome.out .card { animation: welcomeOut .5s cubic-bezier(.4,0,.7,1) forwards; }
-  .welcome .mark { width: 46px; height: 46px; margin: 0 0 16px; }
+  .welcome .mark { width: 52px; height: 52px; margin: 0 auto 16px; }
   .welcome h2 {
     margin: 0; font-family: var(--display); font-size: 26px; font-weight: 500;
     letter-spacing: -0.025em; text-shadow: var(--text-shadow);
@@ -683,13 +689,7 @@
 
   <div id="authView" class="page hidden">
     <div class="authwrap">
-      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="32" cy="32" r="25" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="8" />
-        <circle cx="32" cy="32" r="25" fill="none" stroke="#25CE9B" stroke-width="8" stroke-linecap="round"
-                stroke-dasharray="88 69.08" transform="rotate(-90 32 32)" />
-        <circle cx="32" cy="32" r="25" fill="none" stroke="#D94459" stroke-width="8" stroke-linecap="round"
-                stroke-dasharray="44 113.08" stroke-dashoffset="-94" transform="rotate(-90 32 32)" />
-      </svg>
+      <img class="mark" src="auctus-mark-512.png" alt="" width="512" height="512" />
       <h1 class="auth-title">Auctus</h1>
       <p class="auth-sub" id="authSub">The smarter way to track your money.</p>
 
@@ -2015,13 +2015,7 @@
     el.setAttribute('role', 'status');
     el.innerHTML =
       '<div class="card">' +
-        '<svg class="mark" viewBox="0 0 64 64" aria-hidden="true">' +
-          '<circle cx="32" cy="32" r="25" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="8"/>' +
-          '<circle cx="32" cy="32" r="25" fill="none" stroke="#25CE9B" stroke-width="8" stroke-linecap="round"' +
-          ' stroke-dasharray="88 69.08" transform="rotate(-90 32 32)"/>' +
-          '<circle cx="32" cy="32" r="25" fill="none" stroke="#D94459" stroke-width="8" stroke-linecap="round"' +
-          ' stroke-dasharray="44 113.08" stroke-dashoffset="-94" transform="rotate(-90 32 32)"/>' +
-        '</svg>' +
+        '<img class="mark" src="auctus-mark-512.png" alt="" width="512" height="512" />' +
         '<h2>Welcome to Auctus</h2>' +
         '<p>' + (name ? 'Good to have you, ' + esc(name) + '. Your first month is ready.'
                       : 'Your first month is ready.') + '</p>' +
