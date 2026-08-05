@@ -653,25 +653,28 @@
       <p class="auth-sub" id="authSub">What you earn, what you spend, and what is left.</p>
 
       <div class="panel auth-panel">
-        <label class="field"><span>Email</span>
-          <input id="a-email" type="email" autocomplete="email" placeholder="you@example.com" /></label>
+        <form id="a-form">
+          <label class="field"><span>Email</span>
+            <input id="a-email" type="email" autocomplete="email" placeholder="you@example.com" /></label>
 
-        <label class="field"><span>Password</span>
-          <div class="pass-wrap">
-            <input id="a-pass" type="password" autocomplete="current-password" placeholder="At least 6 characters" />
-            <button type="button" class="peek" id="a-peek" aria-label="Show password">Show</button>
-          </div>
-        </label>
+          <label class="field"><span>Password</span>
+            <div class="pass-wrap">
+              <input id="a-pass" type="password" autocomplete="current-password" placeholder="At least 6 characters" />
+              <button type="button" class="peek" id="a-peek" aria-label="Show password">Show</button>
+            </div>
+          </label>
 
-        <div class="err" id="a-err"></div>
-        <div class="note" id="a-note"></div>
+          <div class="err" id="a-err"></div>
+          <div class="note" id="a-note"></div>
 
-        <button class="btn primary" id="a-go">Log in</button>
-        <button class="linkbtn" id="a-forgot">Forgot your password?</button>
+          <button class="btn primary" id="a-go" type="submit">Log in</button>
+        </form>
+
+        <button class="linkbtn" id="a-forgot" type="button">Forgot your password?</button>
 
         <div class="auth-foot">
           <span id="a-prompt">New to Auctus?</span>
-          <button class="inlink" id="a-toggle">Sign up</button>
+          <button class="inlink" id="a-toggle" type="button">Sign up</button>
         </div>
       </div>
     </div>
@@ -884,58 +887,70 @@
 <!-- ---------------------------------------------------------------
      Firebase lives in its own module and hands the app a small, plain
      surface on window.FB. The app below stays the ES5 IIFE it always
-     was; it just talks to this. Both are `type="module"`, and module
-     scripts evaluate in document order after their imports resolve,
-     so window.FB is always ready before the app runs.
+     was; it just talks to this. The app waits on the fb-ready event
+     rather than assuming script order, so nothing here can race it.
      --------------------------------------------------------------- -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-analytics.js";
-  import {
-    getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence,
-    signInWithEmailAndPassword, createUserWithEmailAndPassword,
-    signOut, sendPasswordResetEmail
-  } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
-  import {
-    getFirestore, doc, getDoc, setDoc, serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+  function fail(err) {
+    console.error('Firebase failed to start', err);
+    window.FB_ERROR = (err && err.message) || String(err);
+    window.dispatchEvent(new Event('fb-ready'));
+  }
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyCnZH4OsbI7_aliScAiNl9ZO8hEfZ9FpNU",
-    authDomain: "auctus-edab6.firebaseapp.com",
-    projectId: "auctus-edab6",
-    storageBucket: "auctus-edab6.firebasestorage.app",
-    messagingSenderId: "273071825665",
-    appId: "1:273071825665:web:0197fb0158d7a95b027100",
-    measurementId: "G-EERZ2VJWEX"
-  };
+  try {
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js");
+    const {
+      getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, sendPasswordResetEmail
+    } = await import("https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js");
+    const {
+      getFirestore, doc, getDoc, setDoc, serverTimestamp
+    } = await import("https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js");
 
-  const app = initializeApp(firebaseConfig);
-  /* analytics throws on file:// and in some privacy modes; it must not
-     take the rest of this module down with it */
-  try { getAnalytics(app); } catch (err) { /* fine without it */ }
+    const firebaseConfig = {
+      apiKey: "AIzaSyCnZH4OsbI7_aliScAiNl9ZO8hEfZ9FpNU",
+      authDomain: "auctus-edab6.firebaseapp.com",
+      projectId: "auctus-edab6",
+      storageBucket: "auctus-edab6.firebasestorage.app",
+      messagingSenderId: "273071825665",
+      appId: "1:273071825665:web:0197fb0158d7a95b027100",
+      measurementId: "G-EERZ2VJWEX"
+    };
 
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-  await setPersistence(auth, browserLocalPersistence).catch(function () {});
+    /* browserLocalPersistence is already the web default; this just makes
+       it explicit, and it must not block the app from starting */
+    setPersistence(auth, browserLocalPersistence).catch(function () {});
 
-  window.FB = {
-    onAuth: function (cb) { return onAuthStateChanged(auth, cb); },
-    signIn: function (email, pass) { return signInWithEmailAndPassword(auth, email, pass); },
-    signUp: function (email, pass) { return createUserWithEmailAndPassword(auth, email, pass); },
-    signOut: function () { return signOut(auth); },
-    resetPassword: function (email) { return sendPasswordResetEmail(auth, email); },
-    readDoc: function (uid) {
-      return getDoc(doc(db, 'users', uid)).then(function (snap) {
-        return snap.exists() ? (snap.data().data || null) : null;
-      });
-    },
-    writeDoc: function (uid, json) {
-      return setDoc(doc(db, 'users', uid), { data: json, updatedAt: serverTimestamp() });
-    }
-  };
-  window.dispatchEvent(new Event('fb-ready'));
+    /* analytics is optional and is blocked by plenty of extensions, so it
+       loads last and separately — it must never take auth down with it */
+    import("https://www.gstatic.com/firebasejs/12.17.1/firebase-analytics.js")
+      .then(function (m) { m.getAnalytics(app); })
+      .catch(function () { /* fine without it */ });
+
+    window.FB = {
+      onAuth: function (cb) { return onAuthStateChanged(auth, cb); },
+      signIn: function (email, pass) { return signInWithEmailAndPassword(auth, email, pass); },
+      signUp: function (email, pass) { return createUserWithEmailAndPassword(auth, email, pass); },
+      signOut: function () { return signOut(auth); },
+      resetPassword: function (email) { return sendPasswordResetEmail(auth, email); },
+      readDoc: function (uid) {
+        return getDoc(doc(db, 'users', uid)).then(function (snap) {
+          return snap.exists() ? (snap.data().data || null) : null;
+        });
+      },
+      writeDoc: function (uid, json) {
+        return setDoc(doc(db, 'users', uid), { data: json, updatedAt: serverTimestamp() });
+      }
+    };
+    window.dispatchEvent(new Event('fb-ready'));
+  } catch (err) {
+    fail(err);
+  }
 </script>
 
 <script type="module">
@@ -1879,7 +1894,10 @@
     /* on success the auth listener takes over and swaps the page */
   }
 
-  document.getElementById('a-go').onclick = submitAuth;
+  document.getElementById('a-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    submitAuth();
+  });
   document.getElementById('a-toggle').onclick = function () {
     setAuthMode(!creating);
     document.getElementById('a-email').focus();
@@ -1892,9 +1910,6 @@
     this.setAttribute('aria-label', hidden ? 'Hide password' : 'Show password');
     pass.focus();
   };
-  document.getElementById('authView').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && e.target.tagName === 'INPUT') submitAuth();
-  });
   document.getElementById('a-forgot').onclick = function () {
     var email = document.getElementById('a-email').value.trim();
     if (!email) {
@@ -1980,14 +1995,36 @@
   }
 
   buildProfitRing();
-  if (!window.FB) {
-    document.getElementById('bootView').textContent =
-      'Could not load Firebase. Check your connection and reload.';
-  } else {
+
+  function bootFailed(msg) {
+    document.getElementById('bootView').textContent = msg;
+  }
+
+  /* The Firebase module signals fb-ready when it settles, either way. Waiting
+     on the event instead of on script order means load timing cannot race us. */
+  function whenFirebaseReady(cb) {
+    if (window.FB) return cb();
+    if (window.FB_ERROR) return bootFailed('Firebase could not start: ' + window.FB_ERROR);
+    var done = false;
+    var timer = setTimeout(function () {
+      if (done) return;
+      done = true;
+      bootFailed('Firebase is taking too long to load. Check your connection, then reload.');
+    }, 15000);
+    window.addEventListener('fb-ready', function () {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (window.FB) cb();
+      else bootFailed('Firebase could not start: ' + (window.FB_ERROR || 'unknown error'));
+    });
+  }
+
+  whenFirebaseReady(function () {
     window.FB.onAuth(function (user) {
       if (user) signedIn(user); else signedOut();
     });
-  }
+  });
 })();
 </script>
 
