@@ -642,6 +642,25 @@
   @keyframes welcomeIn { from { opacity: 0; transform: translateY(18px) scale(.96); } }
   @keyframes welcomeOut { to { opacity: 0; transform: translateY(-10px) scale(.98); } }
 
+  /* ---------- trends ---------- */
+  .panel.flat { display: block; }
+  .rowbtn { width: 100%; margin-top: 12px; }
+  .cat .stack { z-index: 1; min-width: 0; }
+  .cat .stack .name { margin: 0; }
+  .t-sub {
+    font-size: 11px; color: var(--ink-faint); margin-top: 2px;
+    font-variant-numeric: tabular-nums; letter-spacing: .01em;
+  }
+  .nowtag {
+    margin-left: 7px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-faint); vertical-align: 1px;
+  }
+  .cat.loss .amt b { color: #FFC9D2; }
+  .t-foot {
+    margin-top: 14px; font-size: 12px; color: var(--ink-faint);
+    text-align: center; line-height: 1.5;
+  }
+
   @media (max-width: 1000px) {
     .panel { grid-template-columns: minmax(0, 330px) minmax(0, 1fr); gap: 32px; }
     .ring-holder { width: min(320px, 78vw); }
@@ -841,7 +860,27 @@
           <span id="pMargin"></span>
         </div>
         <div class="cats" id="pRows"></div>
+        <button class="btn ghost rowbtn" id="trendsBtn">
+          <span>See trends</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
       </div>
+    </div>
+  </div>
+
+  <div id="trendsView" class="page hidden">
+    <div class="month-bar">
+      <h1 class="month">Trends</h1>
+    </div>
+    <div class="kicker" id="tKicker">Profit, month by month</div>
+
+    <div class="panel flat">
+      <div class="cat-head">
+        <h2 id="tHeading">Profit by month</h2>
+        <span id="tSummary"></span>
+      </div>
+      <div class="cats" id="tRows"></div>
+      <div class="t-foot" id="tFoot"></div>
     </div>
   </div>
 
@@ -1640,6 +1679,84 @@
     }).join('');
   }
 
+  /* ---------- trends ---------- */
+  var MIN_BACK = 3;    /* always show at least this many months before the current one */
+  var MAX_MONTHS = 12; /* ...and never more than a year at once */
+
+  function signedMoney(n) {
+    return (n < 0 ? '\u2212' : '') + money(Math.abs(n));
+  }
+
+  function monthTotals(mk) {
+    var all = state.entries[mk] || [];
+    var rev = 0, exp = 0;
+    all.forEach(function (e) {
+      if (e.type === 'revenue') rev += e.amount; else exp += e.amount;
+    });
+    return { rev: rev, exp: exp, profit: rev - exp };
+  }
+
+  function renderTrends() {
+    /* months as a single running index makes the window arithmetic trivial */
+    var cur = view.year * 12 + view.month;
+    var first = cur - MIN_BACK;
+
+    Object.keys(state.entries).forEach(function (mk) {
+      if (!(state.entries[mk] || []).length) return;
+      var p = mk.split('-');
+      var i = parseInt(p[0], 10) * 12 + (parseInt(p[1], 10) - 1);
+      if (i < first) first = i;
+    });
+    if (cur - first + 1 > MAX_MONTHS) first = cur - (MAX_MONTHS - 1);
+
+    var nowIdx = today.getFullYear() * 12 + today.getMonth();
+    var rows = [];
+    for (var i = cur; i >= first; i--) {
+      var y = Math.floor(i / 12), m = i - y * 12;
+      var mk = y + '-' + String(m + 1).padStart(2, '0');
+      var t = monthTotals(mk);
+      rows.push({ y: y, m: m, idx: i, rev: t.rev, exp: t.exp, profit: t.profit });
+    }
+
+    var maxAbs = rows.reduce(function (n, r) { return Math.max(n, Math.abs(r.profit)); }, 0);
+    var active = rows.filter(function (r) { return r.rev > 0 || r.exp > 0; });
+    var up = active.filter(function (r) { return r.profit > 0; }).length;
+    var avg = active.length
+      ? active.reduce(function (s, r) { return s + r.profit; }, 0) / active.length
+      : 0;
+
+    document.getElementById('tKicker').textContent =
+      rows.length + (rows.length === 1 ? ' month' : ' months') + ', newest first';
+
+    document.getElementById('tSummary').textContent = active.length
+      ? 'Average ' + signedMoney(avg) + ' \u00B7 ' + up + ' of ' + active.length + ' profitable'
+      : '';
+
+    document.getElementById('tRows').innerHTML = rows.map(function (r, idx) {
+      var loss = r.profit < 0;
+      var blank = r.rev === 0 && r.exp === 0;
+      var col = loss ? '#D94459' : '#25CE9B';
+      var w = maxAbs > 0 ? (Math.abs(r.profit) / maxAbs) * 100 : 0;
+      return '<div class="cat' + (loss ? ' loss' : '') + (reduced ? '' : ' reveal') + '"' +
+             (reduced ? '' : ' style="animation-delay:' + (idx * 45) + 'ms"') + '>' +
+        '<div class="fillbar" style="width:' + w + '%;background:' + col + '"></div>' +
+        '<div class="dot" style="background:' + col + ';color:' + col + '"></div>' +
+        '<div class="stack">' +
+          '<div class="name">' + MONTHS[r.m] + ' ' + r.y +
+            (r.idx === nowIdx ? '<span class="nowtag">this month</span>' : '') +
+          '</div>' +
+          '<div class="t-sub">' + (blank ? 'Nothing logged'
+            : money(r.rev) + ' in \u00B7 ' + money(r.exp) + ' out') + '</div>' +
+        '</div>' +
+        '<div class="amt"><b>' + signedMoney(r.profit) + '</b></div>' +
+        '<span></span></div>';
+    }).join('');
+
+    document.getElementById('tFoot').textContent = active.length < 2
+      ? 'Trends get more useful with a few months behind them.'
+      : '';
+  }
+
   function openProfitGoal() {
     dialog.innerHTML =
       '<h3>Set your profit goal</h3>' +
@@ -1679,13 +1796,21 @@
   }
 
   function showPage(name) {
-    var settings = name === 'settings', profit = name === 'profit', auth = name === 'auth';
+    var settings = name === 'settings', profit = name === 'profit',
+        auth = name === 'auth', trends = name === 'trends';
     document.getElementById('bootView').classList.add('hidden');
     document.getElementById('authView').classList.toggle('hidden', !auth);
-    document.getElementById('budgetView').classList.toggle('hidden', settings || profit || auth);
+    document.getElementById('budgetView').classList.toggle('hidden', settings || profit || auth || trends);
     document.getElementById('gear').classList.toggle('hidden', settings || auth);
-    document.getElementById('profitBtn').classList.toggle('hidden', settings || profit || auth);
-    document.getElementById('homeBtn').classList.toggle('hidden', !profit);
+    document.getElementById('profitBtn').classList.toggle('hidden', settings || profit || auth || trends);
+    document.getElementById('homeBtn').classList.toggle('hidden', !(profit || trends));
+
+    var tv = document.getElementById('trendsView');
+    tv.classList.toggle('hidden', !trends);
+    if (trends) {
+      renderTrends();
+      tv.classList.remove('page'); void tv.offsetWidth; tv.classList.add('page');
+    }
     var pv = document.getElementById('profitView');
     pv.classList.toggle('hidden', !profit);
     if (profit) {
@@ -1702,7 +1827,7 @@
         : '\u2014';
       applySettings();
       sv.classList.remove('page'); void sv.offsetWidth; sv.classList.add('page');
-    } else if (!profit && !auth) {
+    } else if (!profit && !auth && !trends) {
       render();
     }
     window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
@@ -1834,6 +1959,7 @@
   document.getElementById('profitBtn').onclick = function () { prevProfit = 0; showPage('profit'); };
   document.getElementById('homeBtn').onclick = function () { showPage('budget'); };
   document.getElementById('pGoalBtn').onclick = openProfitGoal;
+  document.getElementById('trendsBtn').onclick = function () { showPage('trends'); };
   document.getElementById('pPrev').onclick = function () {
     view.month--; if (view.month < 0) { view.month = 11; view.year--; }
     ctxKey = ''; renderProfit();
