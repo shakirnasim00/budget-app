@@ -692,9 +692,14 @@
     .ring-holder { width: min(320px, 78vw); }
   }
   @media (max-width: 780px) {
-    /* a stacked pair of 11px chevrons is not a touch target — on a phone the
-       arrows move either side of the date and grow to 44px */
-    .daystep { gap: 2px; margin: 6px 0 22px; }
+    /* A stacked pair of 11px chevrons is not a touch target, so on a phone the
+       arrows move either side of the date and grow to 44px. The row also lifts
+       above the title and centres — left-aligned, its arrows hung awkwardly off
+       the edge of the line. The title itself stays left-aligned. */
+    .entry-dialog { display: flex; flex-direction: column; }
+    .entry-dialog h3 { margin-bottom: 16px; }
+    .entry-dialog .daystep { order: -1; justify-content: center; margin: 0 0 2px; }
+    .daystep { gap: 2px; }
     .daystep .steparrows { display: none; }
     .daystep #f-dayLabel { min-width: 116px; text-align: center; }
     .stepwide {
@@ -1475,7 +1480,11 @@
   var scrim = document.getElementById('scrim');
   var dialog = document.getElementById('dialog');
 
-  function closeDialog() { scrim.classList.remove('open'); dialog.innerHTML = ''; }
+  function closeDialog() {
+    scrim.classList.remove('open');
+    dialog.classList.remove('entry-dialog');
+    dialog.innerHTML = '';
+  }
   scrim.addEventListener('click', function (e) { if (e.target === scrim) closeDialog(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDialog(); });
 
@@ -1539,6 +1548,7 @@
       '</div>' +
       (editing ? '<button class="removeline" id="f-del">Delete this entry</button>' : '');
 
+    dialog.classList.add('entry-dialog');
     scrim.classList.add('open');
 
     var daystep = dialog.querySelector('.daystep');
