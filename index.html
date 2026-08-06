@@ -547,8 +547,10 @@
   .checkline .ct b { display: block; font-size: 13px; font-weight: 500; }
   .checkline .ct small { display: block; font-size: 11px; color: var(--ink-faint); margin-top: 1px; line-height: 1.35; }
 
-  /* the dialog sub-line doubles as the date stepper */
-  .daystep { display: flex; align-items: center; gap: 9px; }
+  /* the dialog sub-line doubles as the date stepper. `.sub`'s margin only
+     applies to p.sub, so this sets its own. */
+  .daystep { display: flex; align-items: center; gap: 9px; margin: 2px 0 20px; }
+  .stepwide { display: none; }
   .daystep #f-dayLabel { font-variant-numeric: tabular-nums; }
   .steparrows { display: inline-flex; flex-direction: column; gap: 2px; }
   .steparrows button {
@@ -690,6 +692,20 @@
     .ring-holder { width: min(320px, 78vw); }
   }
   @media (max-width: 780px) {
+    /* a stacked pair of 11px chevrons is not a touch target — on a phone the
+       arrows move either side of the date and grow to 44px */
+    .daystep { gap: 2px; margin: 6px 0 22px; }
+    .daystep .steparrows { display: none; }
+    .daystep #f-dayLabel { min-width: 116px; text-align: center; }
+    .stepwide {
+      display: grid; place-items: center; flex: 0 0 auto;
+      width: 44px; height: 44px; padding: 0;
+      background: none; border: 0; border-radius: 13px; cursor: pointer;
+      color: var(--ink-soft); transition: .16s ease;
+    }
+    .stepwide:active:not(:disabled) { background: var(--row-hover); color: var(--ink); }
+    .stepwide:disabled { opacity: .2; }
+
     .topbar { height: 30px; }
     .gear { position: absolute; right: 0; top: 0; }
     .profitbtn { position: absolute; left: 0; top: 4px; font-size: 12px; max-width: 45%; }
@@ -1480,15 +1496,21 @@
     dialog.innerHTML =
       '<h3>' + (editing ? 'Edit entry' : (isExp ? 'Add expense' : 'Add revenue')) + '</h3>' +
       '<div class="sub daystep">' +
+        '<button type="button" class="stepwide" data-step="-1" aria-label="Day before">' +
+          '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>' +
+        '</button>' +
         '<span id="f-dayLabel" aria-live="polite"></span>' +
         '<span class="steparrows">' +
-          '<button type="button" id="f-dayNext" aria-label="Day after">' +
+          '<button type="button" data-step="1" aria-label="Day after">' +
             '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>' +
           '</button>' +
-          '<button type="button" id="f-dayPrev" aria-label="Day before">' +
+          '<button type="button" data-step="-1" aria-label="Day before">' +
             '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' +
           '</button>' +
         '</span>' +
+        '<button type="button" class="stepwide" data-step="1" aria-label="Day after">' +
+          '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>' +
+        '</button>' +
       '</div>' +
       '<div class="row2">' +
         '<label class="field"><span>Amount</span><input id="f-amt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"' +
@@ -1519,15 +1541,24 @@
 
     scrim.classList.add('open');
 
+    var daystep = dialog.querySelector('.daystep');
     function paintDay() {
       document.getElementById('f-dayLabel').textContent =
         MONTHS[view.month] + ' ' + ordinal(day);
-      document.getElementById('f-dayPrev').disabled = day <= 1;
-      document.getElementById('f-dayNext').disabled = day >= last;
+      daystep.querySelectorAll('[data-step]').forEach(function (b) {
+        b.disabled = b.getAttribute('data-step') === '1' ? day >= last : day <= 1;
+      });
     }
     paintDay();
-    document.getElementById('f-dayPrev').onclick = function () { if (day > 1) { day--; paintDay(); } };
-    document.getElementById('f-dayNext').onclick = function () { if (day < last) { day++; paintDay(); } };
+    function stepDay(by) {
+      var next = day + by;
+      if (next < 1 || next > last) return;
+      day = next; paintDay();
+    }
+    daystep.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-step]');
+      if (b && !b.disabled) stepDay(parseInt(b.getAttribute('data-step'), 10));
+    });
 
     var amt = document.getElementById('f-amt');
     amt.focus();
