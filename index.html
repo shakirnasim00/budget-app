@@ -547,17 +547,19 @@
   .checkline .ct b { display: block; font-size: 13px; font-weight: 500; }
   .checkline .ct small { display: block; font-size: 11px; color: var(--ink-faint); margin-top: 1px; line-height: 1.35; }
 
-  .daypick {
-    display: flex; align-items: center; gap: 10px;
-    padding: 7px 8px; border-radius: 14px;
-    background: var(--row-hover); border: 1px solid var(--edge-soft);
+  /* the dialog sub-line doubles as the date stepper */
+  .daystep { display: flex; align-items: center; gap: 9px; }
+  .daystep #f-dayLabel { font-variant-numeric: tabular-nums; }
+  .steparrows { display: inline-flex; flex-direction: column; gap: 2px; }
+  .steparrows button {
+    display: grid; place-items: center;
+    background: none; border: 0; padding: 0 3px; cursor: pointer;
+    color: var(--ink-faint); border-radius: 4px; line-height: 0;
+    transition: color .16s ease, transform .12s ease;
   }
-  .dayval {
-    flex: 1; text-align: center; font-size: 15px;
-    font-variant-numeric: tabular-nums; letter-spacing: .01em;
-  }
-  .navbtn:disabled { opacity: .28; cursor: default; }
-  .navbtn:disabled:hover { background: var(--glass); transform: none; }
+  .steparrows button:hover:not(:disabled) { color: var(--ink); }
+  .steparrows button:active:not(:disabled) { transform: scale(.82); }
+  .steparrows button:disabled { opacity: .22; cursor: default; }
   /* the category label is uppercased, the date beside it should not be */
   .entry .e-date { text-transform: none; letter-spacing: .02em; }
 
@@ -1193,8 +1195,6 @@
   }
   /* short form for the entry rows: "Aug 4th" */
   function shortDate(m, d) { return MON_SHORT[m] + ' ' + ordinal(d); }
-  /* long form for the picker: "August 4, 2026" */
-  function longDate(y, m, d) { return MONTHS[m] + ' ' + d + ', ' + y; }
   /* today when you're looking at this month, otherwise the 1st */
   function defaultDay() {
     return (view.year === today.getFullYear() && view.month === today.getMonth())
@@ -1479,6 +1479,17 @@
 
     dialog.innerHTML =
       '<h3>' + (editing ? 'Edit entry' : (isExp ? 'Add expense' : 'Add revenue')) + '</h3>' +
+      '<div class="sub daystep">' +
+        '<span id="f-dayLabel" aria-live="polite"></span>' +
+        '<span class="steparrows">' +
+          '<button type="button" id="f-dayNext" aria-label="Day after">' +
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>' +
+          '</button>' +
+          '<button type="button" id="f-dayPrev" aria-label="Day before">' +
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' +
+          '</button>' +
+        '</span>' +
+      '</div>' +
       '<div class="row2">' +
         '<label class="field"><span>Amount</span><input id="f-amt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"' +
           (editing ? ' value="' + item.amount + '"' : '') + ' /></label>' +
@@ -1489,17 +1500,6 @@
           }).join('') +
         '</select></label>' +
       '</div>' +
-      '<label class="field"><span>Date</span>' +
-        '<div class="daypick">' +
-          '<button type="button" class="navbtn sm" id="f-dayPrev" aria-label="Day before">' +
-            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>' +
-          '</button>' +
-          '<span class="dayval" id="f-dayLabel" aria-live="polite"></span>' +
-          '<button type="button" class="navbtn sm" id="f-dayNext" aria-label="Day after">' +
-            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>' +
-          '</button>' +
-        '</div>' +
-      '</label>' +
       '<label class="field"><span>' + (isExp ? 'What was it for' : 'Where from') + '</span>' +
         '<input id="f-note" type="text" placeholder="' + (isExp ? 'Groceries at the market' : 'August paycheck') + '"' +
         (editing ? ' value="' + esc(item.note || '') + '"' : '') + ' /></label>' +
@@ -1520,7 +1520,8 @@
     scrim.classList.add('open');
 
     function paintDay() {
-      document.getElementById('f-dayLabel').textContent = longDate(view.year, view.month, day);
+      document.getElementById('f-dayLabel').textContent =
+        MONTHS[view.month] + ' ' + ordinal(day);
       document.getElementById('f-dayPrev').disabled = day <= 1;
       document.getElementById('f-dayNext').disabled = day >= last;
     }
