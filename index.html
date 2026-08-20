@@ -464,10 +464,14 @@
   .fopt .fchk { opacity: 0; transform: scale(.7); transition: .16s cubic-bezier(.22,.85,.26,1); }
   .fopt[aria-selected="true"] .fchk { opacity: 1; transform: scale(1); }
   .fdiv { height: 1px; margin: 5px 9px; background: var(--edge-soft); }
+  /* The fold used to animate against a fixed 3000px cap, which quietly clipped
+     any month with more rows than that. The handler now measures the list and
+     sets the height inline for the length of the animation, then releases it,
+     so the list can be any height and still open and close smoothly. */
   #entryList {
     overflow: hidden;
     transition: max-height .38s cubic-bezier(.22,.85,.26,1), opacity .26s ease;
-    max-height: 3000px; opacity: 1;
+    max-height: none; opacity: 1;
   }
   #entryList.folded { max-height: 0; opacity: 0; }
   .entry {
@@ -495,6 +499,22 @@
     border: 1px dashed var(--edge-soft); background: var(--row);
     color: var(--ink-soft); font-size: 14px;
   }
+  .entry.reveal { animation: liftIn .44s cubic-bezier(.22,.85,.26,1) backwards; }
+
+  /* ---------- entry paging ---------- */
+  .pager { display: flex; gap: 8px; margin-top: 2px; }
+  .morebtn {
+    flex: 1; min-width: 0;
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 11px 12px; border-radius: 14px; cursor: pointer;
+    background: var(--row); border: 1px solid var(--edge-soft);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    font-family: var(--ui); font-size: 13px; font-weight: 500; letter-spacing: .02em;
+    color: var(--ink-soft); transition: .18s ease;
+  }
+  .morebtn:hover { background: var(--row-hover); color: var(--ink); }
+  .morebtn:active { transform: scale(.99); transition-duration: .07s; }
+  .morebtn .plus { font-size: 15px; line-height: 0; opacity: .8; }
 
   /* ---------- dialog ---------- */
   .addcat {
@@ -1212,6 +1232,14 @@
 
   var entriesOpen = true;
   var entryFilter = 'all';
+
+  /* A long month is drawn a page at a time. entryLimit is how many rows are on
+     screen right now; pagedFrom marks where the newest page begins so only the
+     rows that just arrived animate in. Both reset whenever the list changes
+     underneath them — a new month, a new tab, a new filter. */
+  var ENTRY_PAGE = 50;
+  var entryLimit = ENTRY_PAGE;
+  var pagedFrom = null;
   var reducedMQ = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var reduced = reducedMQ;
   var prevSeg = {}, prevAmt = {}, prevTotal = 0, ctxKey = '', freshId = null;
@@ -1252,6 +1280,7 @@
     state.settings.ambient = look.ambient;
     state.settings.reduceMotion = look.reduceMotion;
     prevSeg = {}; prevAmt = {}; prevTotal = 0; prevProfit = 0; ctxKey = ''; entryFilter = 'all';
+    entryLimit = ENTRY_PAGE; pagedFrom = null;
     view = { year: today.getFullYear(), month: today.getMonth(), tab: 'expenses' };
   }
 
@@ -1412,7 +1441,7 @@
 
     var ctx = tab + '|' + monthKey();
     var sweep = ctx !== ctxKey;
-    if (sweep) { prevSeg = {}; prevAmt = {}; prevTotal = 0; }
+    if (sweep) { prevSeg = {}; prevAmt = {}; prevTotal = 0; entryLimit = ENTRY_PAGE; }
     ctxKey = ctx;
 
     document.getElementById('monthLabel').innerHTML =
@@ -1544,6 +1573,16 @@
       ? all.filter(function (it) { return it.e.category === entryFilter; })
       : all;
     renderFilter(all);
+
+    /* a deletion can leave the limit stranded above the list; pull it back to
+       the smallest whole page that still covers everything on screen */
+    if (entryLimit > ENTRY_PAGE && entryLimit - ENTRY_PAGE >= items.length) {
+      entryLimit = Math.max(ENTRY_PAGE, Math.ceil(items.length / ENTRY_PAGE) * ENTRY_PAGE);
+    }
+    var page = items.slice(0, entryLimit);
+    var from = pagedFrom;
+    pagedFrom = null;
+
     if (!all.length) {
       list.innerHTML = '<div class="empty">' +
         (isExp ? 'No expenses yet. Add one and the ring starts filling.' : 'No revenue yet. Add your first deposit to fill the ring.') +
@@ -1551,10 +1590,12 @@
     } else if (!items.length) {
       list.innerHTML = '<div class="empty">Nothing under ' + esc(picked.label) + ' this month.</div>';
     } else {
-      list.innerHTML = items.map(function (it) {
+      list.innerHTML = page.map(function (it, idx) {
         var e = it.e;
         var c = cats.filter(function (x) { return x.id === e.category; })[0] || { color: '#fff', label: 'Other' };
-        return '<div class="entry' + (e.id === freshId ? ' fresh' : '') + '">' +
+        var justPaged = from !== null && idx >= from && !reduced;
+        return '<div class="entry' + (e.id === freshId ? ' fresh' : '') + (justPaged ? ' reveal' : '') + '"' +
+          (justPaged ? ' style="animation-delay:' + Math.min((idx - from) * 22, 420) + 'ms"' : '') + '>' +
           '<div class="dot" style="background:' + c.color + ';color:' + c.color + '"></div>' +
           '<div><div class="e-name">' + esc(e.note || c.label) +
             (e.rec ? '<span class="rec-mark" title="Repeats monthly">\u21BB</span>' : '') +
@@ -1566,11 +1607,49 @@
             '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>' +
           '</button>' +
           '</div>';
-      }).join('');
+      }).join('') + pagerHTML(items.length);
     }
     document.getElementById('foldCount').textContent =
       items.length ? items.length + (items.length === 1 ? ' item' : ' items') : '';
     freshId = null;
+  }
+
+  /* ---------- entry paging ---------- */
+  /* Both buttons live inside #entryList so they fold away with it and land
+     directly under the last row. */
+  function pagerHTML(total) {
+    var more = total > entryLimit;
+    var less = entryLimit > ENTRY_PAGE;
+    if (!more && !less) return '';
+    return '<div class="pager">' +
+      (more ? '<button class="morebtn" type="button" data-page="more">Show more' +
+                '<span class="plus" aria-hidden="true">+</span></button>' : '') +
+      (less ? '<button class="morebtn" type="button" data-page="less">Show less</button>' : '') +
+      '</div>';
+  }
+
+  function pageEntries(dir) {
+    /* the list is redrawn wholesale, so a keyboard user would lose the button
+       out from under them — put focus back on it if it is still there */
+    var act = document.activeElement;
+    var held = act && act.getAttribute && act.getAttribute('data-page') === dir;
+
+    if (dir === 'more') {
+      pagedFrom = entryLimit;
+      entryLimit += ENTRY_PAGE;
+      render();
+      var again = document.querySelector('#entryList [data-page="more"]');
+      if (held && again) again.focus({ preventScroll: true });
+      return;
+    }
+    entryLimit = ENTRY_PAGE;
+    render();
+    /* collapsing can leave you scrolled past the end of the list, so come back
+       to the top of it — but only if it has already scrolled off the screen */
+    var head = document.getElementById('entriesHeading');
+    if (head.getBoundingClientRect().top < 0) {
+      head.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' });
+    }
   }
 
   /* ---------- entry filter ---------- */
@@ -1624,7 +1703,7 @@
     document.getElementById('filterMenu').classList.remove('open');
     document.getElementById('filterBtn').setAttribute('aria-expanded', 'false');
   }
-  function resetFilter() { entryFilter = 'all'; closeFilterMenu(); }
+  function resetFilter() { entryFilter = 'all'; entryLimit = ENTRY_PAGE; closeFilterMenu(); }
 
   /* ---------- ring tooltip ---------- */
   /* hover is a pointer affordance; on touch there is nothing to hover with,
@@ -2328,6 +2407,7 @@
     var b = e.target.closest('[data-f]');
     if (!b) return;
     entryFilter = b.getAttribute('data-f');
+    entryLimit = ENTRY_PAGE;
     closeFilterMenu();
     render();
   });
@@ -2355,10 +2435,28 @@
   };
   document.getElementById('addCat').onclick = function () { openCatEdit(null); };
   document.getElementById('foldEntries').onclick = function () {
+    var list = document.getElementById('entryList');
     entriesOpen = !entriesOpen;
     this.setAttribute('aria-expanded', entriesOpen);
     this.setAttribute('aria-label', entriesOpen ? 'Hide entries' : 'Show entries');
-    document.getElementById('entryList').classList.toggle('folded', !entriesOpen);
+
+    /* The height is measured on each press rather than capped in the
+       stylesheet: the animation gets a real number to run to, and the cap is
+       lifted again once it lands so paging in more rows can't be clipped. */
+    clearTimeout(list._fold);
+    if (entriesOpen) {
+      list.classList.remove('folded');
+      list.style.maxHeight = list.scrollHeight + 'px';
+      list._fold = setTimeout(function () {
+        if (entriesOpen) list.style.maxHeight = 'none';
+      }, reduced ? 0 : 420);
+    } else {
+      list.style.maxHeight = list.scrollHeight + 'px';
+      void list.offsetWidth;
+      list.classList.add('folded');
+      list.style.maxHeight = '0px';
+    }
+
     if (!entriesOpen) closeFilterMenu();
     document.getElementById('filterWrap').classList
       .toggle('hidden', !entriesOpen || !entriesFor(view.tab).length);
@@ -2383,6 +2481,8 @@
     if (b) openCatEdit(b.getAttribute('data-edit'));
   });
   document.getElementById('entryList').addEventListener('click', function (e) {
+    var p = e.target.closest('[data-page]');
+    if (p) { pageEntries(p.getAttribute('data-page')); return; }
     var b = e.target.closest('[data-entry]');
     if (b) openEntry(b.getAttribute('data-entry'));
   });
