@@ -283,7 +283,13 @@
 
   .ring-col { display: flex; flex-direction: column; align-items: center; }
   .ring-holder { position: relative; width: min(390px, 78vw); }
-  svg.ring { width: 100%; height: auto; display: block; overflow: visible; }
+  svg.ring { width: 100%; height: auto; display: block; overflow: visible; transition: filter .55s ease; }
+  /* the ring picks up the same hot/good state as the note below it — a wash of
+     colour bled off the stroke rather than a halo drawn around it */
+  .ring.good { filter: drop-shadow(0 0 9px rgba(37, 206, 155, .28)) drop-shadow(0 0 28px rgba(37, 206, 155, .13)); }
+  .ring.hot  { filter: drop-shadow(0 0 9px rgba(217, 68, 89, .28)) drop-shadow(0 0 28px rgba(217, 68, 89, .13)); }
+  html.dark .ring.good { filter: drop-shadow(0 0 10px rgba(37, 206, 155, .34)) drop-shadow(0 0 32px rgba(37, 206, 155, .17)); }
+  html.dark .ring.hot  { filter: drop-shadow(0 0 10px rgba(217, 68, 89, .34)) drop-shadow(0 0 32px rgba(217, 68, 89, .17)); }
   .track { fill: none; stroke: var(--track); stroke-width: 22; }
   .seg { fill: none; stroke-width: 22; transition: opacity .2s ease, stroke-dasharray .72s cubic-bezier(.22,.85,.26,1), stroke-dashoffset .72s cubic-bezier(.22,.85,.26,1); }
   .ring.dimmed .seg { opacity: .22; }
@@ -656,6 +662,22 @@
   .checkline .ct b { display: block; font-size: 13px; font-weight: 500; }
   .checkline .ct small { display: block; font-size: 11px; color: var(--ink-faint); margin-top: 1px; line-height: 1.35; }
 
+  /* the read-only twin of .checkline — same slot in the dialog, same rhythm,
+     but it states a fact instead of taking an answer */
+  .recline {
+    display: flex; align-items: center; gap: 11px;
+    padding: 12px 13px; border-radius: 14px; margin-bottom: 4px;
+    background: var(--row); border: 1px solid var(--edge-soft);
+  }
+  .recline .rmark {
+    flex: 0 0 auto; width: 21px; height: 21px; border-radius: 7px;
+    display: grid; place-items: center;
+    background: var(--row-hover); border: 1px solid var(--edge-soft);
+    font-size: 13px; line-height: 1; color: var(--ink-soft);
+  }
+  .recline .ct b { display: block; font-size: 13px; font-weight: 500; }
+  .recline .ct small { display: block; font-size: 11px; color: var(--ink-faint); margin-top: 1px; line-height: 1.35; }
+
   /* the dialog sub-line doubles as the date stepper. `.sub`'s margin only
      applies to p.sub, so this sets its own. */
   .daystep { display: flex; align-items: center; gap: 9px; margin: 2px 0 20px; }
@@ -681,6 +703,9 @@
 
   .row2 { display: grid; grid-template-columns: 1fr 1.1fr; gap: 12px; }
   .dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+  /* three choices won't sit in a two-up row, and stacking them keeps the two
+     destructive ones from looking interchangeable at a glance */
+  .stackactions { display: grid; gap: 10px; margin-top: 20px; }
   .err { font-size: 12px; color: #FFD9DE; min-height: 16px; margin-top: -6px; margin-bottom: 8px; }
 
   /* ---------- sign in ---------- */
@@ -1467,18 +1492,22 @@
     document.getElementById('rcOf').textContent = 'of ' + money(target) + (isExp ? ' budget' : ' goal');
 
     var note = document.getElementById('rcNote');
+    var ring = document.getElementById('ring');
     note.classList.remove('hot', 'good');
+    ring.classList.remove('hot', 'good');
     if (target > 0 && total > target) {
       /* past the line either way — red when that means overspending,
          green when it means beating the revenue goal */
       note.style.display = '';
       note.textContent = (isExp ? 'Over by ' : 'Exceeded by ') + money(total - target);
       note.classList.add(isExp ? 'hot' : 'good');
+      ring.classList.add(isExp ? 'hot' : 'good');
     } else if (target > 0 && total === target) {
       /* landed exactly on the number */
       note.style.display = '';
       note.textContent = isExp ? 'Budget maxed' : 'Goal reached';
       note.classList.add(isExp ? 'hot' : 'good');
+      ring.classList.add(isExp ? 'hot' : 'good');
     } else if (target > 0) {
       note.style.display = ''; note.textContent = Math.round((total / target) * 100) + '% of ' + (isExp ? 'budget' : 'goal');
     } else {
@@ -1783,6 +1812,11 @@
     var day = editing ? (item.day || defaultDay()) : defaultDay();
     if (day > last) day = last;
 
+    /* reconstructed from the shared rec id, not stored — see seriesOf */
+    var series = editing && item.rec ? seriesOf(item.rec) : [];
+    var here = view.year * 12 + view.month;
+    var later = series.filter(function (s) { return s.idx > here; });
+
     dialog.innerHTML =
       '<h3>' + (editing ? 'Edit entry' : (isExp ? 'Add expense' : 'Add revenue')) + '</h3>' +
       '<div class="sub daystep">' +
@@ -1815,6 +1849,24 @@
       '<label class="field"><span>' + (isExp ? 'What was it for' : 'Where from') + '</span>' +
         '<input id="f-note" type="text" placeholder="' + (isExp ? 'Groceries at the market' : 'August paycheck') + '"' +
         (editing ? ' value="' + esc(item.note || '') + '"' : '') + ' /></label>' +
+      /* the marker sits in the same slot the "Repeat monthly" checkbox
+         occupies when adding, so the two read as the same idea */
+      (editing && series.length ?
+        '<div class="recline">' +
+          '<span class="rmark" aria-hidden="true">\u21BB</span>' +
+          '<span class="ct"><b>Recurring entry</b>' +
+            '<small>Monthly through ' + labelForIndex(series[series.length - 1].idx) + '.' +
+              (later.length ? '' : ' This is the last one.') + '</small>' +
+          '</span>' +
+        '</div>' +
+        (later.length ?
+          '<label class="checkline">' +
+            '<input type="checkbox" id="f-fwd" />' +
+            '<span class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>' +
+            '<span class="ct"><b>Update going forward</b><small>Applies these changes to the ' +
+              later.length + ' month' + (later.length === 1 ? '' : 's') + ' after ' + MONTHS[view.month] +
+              '. Earlier months keep what they have.</small></span>' +
+          '</label>' : '') : '') +
       (editing ? '' :
         '<label class="checkline">' +
           '<input type="checkbox" id="f-rec" />' +
@@ -1827,7 +1879,9 @@
         '<button class="btn primary" id="f-save">' +
           (editing ? 'Save changes' : (isExp ? 'Add expense' : 'Add revenue')) + '</button>' +
       '</div>' +
-      (editing ? '<button class="removeline" id="f-del">Delete this entry</button>' : '');
+      (editing ? '<button class="removeline" id="f-del">' +
+        (later.length ? 'Delete this recurring entry' : 'Delete this entry') +
+        '</button>' : '');
 
     dialog.classList.add('entry-dialog');
     scrim.classList.add('open');
@@ -1863,7 +1917,11 @@
     }
 
     function commit() {
-      var v = parseFloat(document.getElementById('f-amt').value);
+      /* the delete flow replaces this dialog's contents in place, and the Enter
+         handler below is still bound — bail if the form is no longer here */
+      var amtEl = document.getElementById('f-amt');
+      if (!amtEl) return;
+      var v = parseFloat(amtEl.value);
       if (!(v > 0)) {
         document.getElementById('f-err').textContent = 'Enter an amount greater than zero.';
         amt.focus();
@@ -1876,6 +1934,15 @@
 
       if (editing) {
         item.amount = v; item.category = cat; item.note = note; item.day = day;
+        var fwd = document.getElementById('f-fwd');
+        if (fwd && fwd.checked) {
+          later.forEach(function (s) {
+            var y = Math.floor(s.idx / 12), m = s.idx - y * 12;
+            s.e.amount = v; s.e.category = cat; s.e.note = note;
+            /* the day carries forward, pulled back where the month is short */
+            s.e.day = Math.min(day, daysInMonth(y, m));
+          });
+        }
         save(); closeDialog(); render();
         return;
       }
@@ -1904,6 +1971,30 @@
     }
   }
 
+  /* ---------- recurring series ---------- */
+  /* A series is not stored anywhere. It is only the entries that happen to
+     share a `rec` id, so finding one means scanning the months — cheap at this
+     size, and it means nothing already saved has to be migrated. */
+  function monthIndexOf(mk) {
+    var p = mk.split('-');
+    return parseInt(p[0], 10) * 12 + (parseInt(p[1], 10) - 1);
+  }
+  function seriesOf(rec) {
+    var out = [];
+    if (!rec) return out;
+    Object.keys(state.entries).forEach(function (mk) {
+      (state.entries[mk] || []).forEach(function (e) {
+        if (e.rec === rec) out.push({ mk: mk, idx: monthIndexOf(mk), e: e });
+      });
+    });
+    out.sort(function (a, b) { return a.idx - b.idx; });
+    return out;
+  }
+  function labelForIndex(i) {
+    var y = Math.floor(i / 12);
+    return MONTHS[i - y * 12] + ' ' + y;
+  }
+
   function askDelete(id) {
     var key = monthKey();
     var item = (state.entries[key] || []).filter(function (x) { return x.id === id; })[0];
@@ -1911,11 +2002,49 @@
       state.entries[key] = (state.entries[key] || []).filter(function (x) { return x.id !== id; });
       save(); closeDialog(); render();
     }
-    if (!state.settings.confirmDelete || !item) return drop();
+    if (!item) return drop();
+    /* a series asks about scope even with confirmations turned off — but only
+       when there is something ahead of here to act on */
+    var series = item.rec ? seriesOf(item.rec) : [];
+    var here = view.year * 12 + view.month;
+    var ahead = series.filter(function (s) { return s.idx > here; });
+    if (ahead.length) return askDeleteSeries(item, ahead, drop);
+    if (!state.settings.confirmDelete) return drop();
     var c = findCat(item.type, item.category);
     confirmThen('Delete this entry?',
       esc(item.note || (c ? c.label : 'Entry')) + ' \u00B7 ' + money(item.amount) + '. This can\'t be undone.',
       'Delete', drop);
+  }
+
+  function askDeleteSeries(item, ahead, dropOne) {
+    var c = findCat(item.type, item.category);
+    var here = view.year * 12 + view.month;
+    var count = ahead.length + 1;
+
+    dialog.innerHTML =
+      '<h3>Delete this recurring entry?</h3>' +
+      '<p class="sub">' + esc(item.note || (c ? c.label : 'Entry')) + ' \u00B7 ' + money(item.amount) +
+        ' repeats monthly through ' + labelForIndex(ahead[ahead.length - 1].idx) + '.' +
+        ' Months before ' + MONTHS[view.month] + ' are left alone either way \u2014 change those from inside the month.' +
+      '</p>' +
+      '<div class="stackactions">' +
+        '<button class="btn warn" id="f-one">Delete ' + MONTHS[view.month] + '\u2019s entry only</button>' +
+        '<button class="btn warn" id="f-fwd-del">Stop it here \u00B7 removes ' + count + ' months</button>' +
+        '<button class="btn ghost" id="f-cancel">Keep it</button>' +
+      '</div>';
+    scrim.classList.add('open');
+    document.getElementById('f-one').focus();
+    document.getElementById('f-cancel').onclick = closeDialog;
+    document.getElementById('f-one').onclick = dropOne;
+    document.getElementById('f-fwd-del').onclick = function () {
+      /* this month and everything after it; earlier months are never touched */
+      var rec = item.rec;
+      Object.keys(state.entries).forEach(function (mk) {
+        if (monthIndexOf(mk) < here) return;
+        state.entries[mk] = (state.entries[mk] || []).filter(function (x) { return x.rec !== rec; });
+      });
+      save(); closeDialog(); render();
+    };
   }
 
   function openTarget() {
